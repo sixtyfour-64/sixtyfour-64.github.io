@@ -13,34 +13,49 @@
     background: #0b1e33;
     font-family: system-ui, sans-serif;
     color: #eaf6ff;
+    overflow: hidden; /* 防止手机端拖拽时页面滚动 */
   }
   canvas {
     background: linear-gradient(#123b63, #071523);
     border-radius: 18px;
     box-shadow: 0 12px 40px rgba(0,0,0,.45);
     touch-action: none;
+    max-width: 100%;
+    max-height: 100vh;
+    cursor: pointer;
   }
-  p { margin: 10px; opacity: .8; }
+  p { margin: 10px; opacity: .8; text-align: center; font-size: 14px;}
 </style>
 </head>
 <body>
 <div>
   <canvas id="game" width="360" height="480"></canvas>
-  <p>← → 移动 / 手机直接拖动 · 漏 3 碗结束 · 按 R 重开</p >
+  <p>← → 移动 / 手机拖动 · 按 R 重开</p >
 </div>
 
 <script>
 const c = document.getElementById("game");
 const ctx = c.getContext("2d");
 
-let player, rice, score, life, over, keys, spawnTimer;
+let player, rice, score, life, gameState, keys, spawnTimer;
+// gameState 有三种状态："ready"（准备中）, "playing"（游戏中）, "over"（结束）
 
 function reset() {
   player = { x: 180, y: 420, size: 46, speed: 6 };
   rice = [];
   score = 0;
   life = 3;
-  over = false;
+  gameState = "playing"; // 点击开始后，状态变为游玩中
+  keys = { left: false, right: false };
+  spawnTimer = 0;
+}
+
+function init() {
+  player = { x: 180, y: 420, size: 46, speed: 6 };
+  rice = [];
+  score = 0;
+  life = 3;
+  gameState = "ready"; // 初始状态：准备中
   keys = { left: false, right: false };
   spawnTimer = 0;
 }
@@ -63,7 +78,7 @@ function drawEmoji(text, x, y, size) {
 }
 
 function update() {
-  if (over) return;
+  if (gameState !== "playing") return; // 如果不是游玩状态，不更新逻辑
 
   if (keys.left) player.x -= player.speed;
   if (keys.right) player.x += player.speed;
@@ -95,7 +110,7 @@ function update() {
     if (r.y > c.height + 20) {
       rice.splice(i, 1);
       life--;
-      if (life <= 0) over = true;
+      if (life <= 0) gameState = "over"; // 游戏结束
     }
   }
 }
@@ -133,7 +148,25 @@ function draw() {
   ctx.fillText("白饭：" + score, 16, 16);
   ctx.fillText("生命：" + "❤️".repeat(Math.max(0, life)), 16, 42);
 
-  if (over) {
+  // 准备状态遮罩
+  if (gameState === "ready") {
+    ctx.fillStyle = "rgba(0,0,0,.65)";
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = "bold 32px system-ui";
+    ctx.fillText("鲸鱼娘接白饭", c.width / 2, 160);
+    
+    ctx.font = "20px system-ui";
+    ctx.fillText("点击屏幕 或 按空格键开始", c.width / 2, 230);
+    
+    ctx.font = "16px system-ui";
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.fillText("← → 移动 / 手机左右拖动", c.width / 2, 280);
+  }
+
+  // 结束状态遮罩
+  if (gameState === "over") {
     ctx.fillStyle = "rgba(0,0,0,.55)";
     ctx.fillRect(0, 0, c.width, c.height);
     ctx.fillStyle = "#fff";
@@ -142,7 +175,7 @@ function draw() {
     ctx.fillText("吃撑结束！", c.width / 2, 190);
     ctx.font = "20px system-ui";
     ctx.fillText("共接住 " + score + " 碗白饭", c.width / 2, 235);
-    ctx.fillText("按 R 再摸一局", c.width / 2, 275);
+    ctx.fillText("点击屏幕 或 按 R 再摸一局", c.width / 2, 275);
   }
 }
 
@@ -152,10 +185,15 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
+// 键盘控制
 document.addEventListener("keydown", e => {
   if (e.key === "ArrowLeft") keys.left = true;
   if (e.key === "ArrowRight") keys.right = true;
-  if (e.key.toLowerCase() === "r" && over) reset();
+  if (e.key.toLowerCase() === "r" && gameState === "over") reset();
+  if (e.code === "Space" && (gameState === "ready" || gameState === "over")) {
+    e.preventDefault(); // 防止按空格时网页向下滚动
+    reset();
+  }
 });
 
 document.addEventListener("keyup", e => {
@@ -163,7 +201,9 @@ document.addEventListener("keyup", e => {
   if (e.key === "ArrowRight") keys.right = false;
 });
 
+// 鼠标/手指控制拖动
 function moveByPointer(e) {
+  if (gameState !== "playing") return;
   const rect = c.getBoundingClientRect();
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
   player.x = (clientX - rect.left) * (c.width / rect.width);
@@ -178,7 +218,21 @@ c.addEventListener("mousemove", e => {
   if (e.buttons) moveByPointer(e);
 });
 
-reset();
+// 点击开始/重开
+c.addEventListener("click", () => {
+  if (gameState === "ready" || gameState === "over") {
+    reset();
+  }
+});
+c.addEventListener("touchstart", (e) => {
+  if (gameState === "ready" || gameState === "over") {
+    e.preventDefault(); // 防止触摸时触发页面缩放或滚动
+    reset();
+  }
+});
+
+// 启动游戏
+init();
 loop();
 </script>
 </body>
