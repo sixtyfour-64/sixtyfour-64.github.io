@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鲸鱼娘接白饭</title>
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background: #0b1e33;
+    font-family: system-ui, sans-serif;
+    color: #eaf6ff;
+  }
+  canvas {
+    background: linear-gradient(#123b63, #071523);
+    border-radius: 18px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.45);
+    touch-action: none;
+  }
+  p { margin: 10px; opacity: .8; }
+</style>
+</head>
+<body>
+<div>
+  <canvas id="game" width="360" height="480"></canvas>
+  <p>← → 移动 / 手机直接拖动 · 漏 3 碗结束 · 按 R 重开</p >
+</div>
+
+<script>
+const c = document.getElementById("game");
+const ctx = c.getContext("2d");
+
+let player, rice, score, life, over, keys, spawnTimer;
+
+function reset() {
+  player = { x: 180, y: 420, size: 46, speed: 6 };
+  rice = [];
+  score = 0;
+  life = 3;
+  over = false;
+  keys = { left: false, right: false };
+  spawnTimer = 0;
+}
+
+function spawnRice() {
+  rice.push({
+    x: 30 + Math.random() * (c.width - 60),
+    y: -20,
+    r: 16,
+    vy: 2 + Math.random() * 1.5 + score * 0.015,
+    rot: Math.random() * Math.PI
+  });
+}
+
+function drawEmoji(text, x, y, size) {
+  ctx.font = size + "px serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x, y);
+}
+
+function update() {
+  if (over) return;
+
+  if (keys.left) player.x -= player.speed;
+  if (keys.right) player.x += player.speed;
+  player.x = Math.max(30, Math.min(c.width - 30, player.x));
+
+  spawnTimer++;
+  if (spawnTimer > Math.max(18, 42 - score)) {
+    spawnTimer = 0;
+    spawnRice();
+  }
+
+  for (let i = rice.length - 1; i >= 0; i--) {
+    const r = rice[i];
+    r.y += r.vy;
+    r.rot += 0.03;
+
+    // 接住判定
+    if (
+      r.y > player.y - 28 &&
+      r.y < player.y + 24 &&
+      Math.abs(r.x - player.x) < player.size / 2 + r.r
+    ) {
+      rice.splice(i, 1);
+      score++;
+      continue;
+    }
+
+    // 漏掉
+    if (r.y > c.height + 20) {
+      rice.splice(i, 1);
+      life--;
+      if (life <= 0) over = true;
+    }
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, c.width, c.height);
+
+  // 背景泡泡
+  ctx.globalAlpha = 0.15;
+  for (let i = 0; i < 6; i++) {
+    ctx.beginPath();
+    ctx.arc(40 + i * 60, 80 + (i * 47) % 300, 8 + i * 2, 0, Math.PI * 2);
+    ctx.strokeStyle = "#bde7ff";
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // 白饭
+  rice.forEach(r => {
+    ctx.save();
+    ctx.translate(r.x, r.y);
+    ctx.rotate(r.rot);
+    drawEmoji("🍚", 0, 0, 34);
+    ctx.restore();
+  });
+
+  // 鲸鱼娘
+  drawEmoji("🐳", player.x, player.y, player.size);
+
+  // 状态
+  ctx.fillStyle = "#eaf6ff";
+  ctx.font = "bold 18px system-ui";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText("白饭：" + score, 16, 16);
+  ctx.fillText("生命：" + "❤️".repeat(Math.max(0, life)), 16, 42);
+
+  if (over) {
+    ctx.fillStyle = "rgba(0,0,0,.55)";
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = "bold 30px system-ui";
+    ctx.fillText("吃撑结束！", c.width / 2, 190);
+    ctx.font = "20px system-ui";
+    ctx.fillText("共接住 " + score + " 碗白饭", c.width / 2, 235);
+    ctx.fillText("按 R 再摸一局", c.width / 2, 275);
+  }
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowLeft") keys.left = true;
+  if (e.key === "ArrowRight") keys.right = true;
+  if (e.key.toLowerCase() === "r" && over) reset();
+});
+
+document.addEventListener("keyup", e => {
+  if (e.key === "ArrowLeft") keys.left = false;
+  if (e.key === "ArrowRight") keys.right = false;
+});
+
+function moveByPointer(e) {
+  const rect = c.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  player.x = (clientX - rect.left) * (c.width / rect.width);
+}
+
+c.addEventListener("touchmove", e => {
+  e.preventDefault();
+  moveByPointer(e);
+}, { passive: false });
+
+c.addEventListener("mousemove", e => {
+  if (e.buttons) moveByPointer(e);
+});
+
+reset();
+loop();
+</script>
+</body>
+</html>
